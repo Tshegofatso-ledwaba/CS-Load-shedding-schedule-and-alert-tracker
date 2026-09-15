@@ -1,11 +1,19 @@
 {
-  "name": "server",
+  "name": "cs-load-shedding-server",
   "version": "1.0.0",
-  "description": "",
+  "description": "API for the load shedding schedule and alert tracker",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "node --watch index.js"
   },
-  "keywords": [],
+  "keywords": [
+    "load-shedding",
+    "api",
+    "render"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "type": "commonjs"
 }
