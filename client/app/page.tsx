@@ -10,6 +10,8 @@ const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
 function formatDate(date: string) { return new Intl.DateTimeFormat("en-ZA", { weekday: "short", day: "2-digit", month: "short" }).format(new Date(`${date}T12:00:00`)); }
 function countdown(target: string | null, now: number) { if (!target) return "--"; const seconds = Math.max(0, Math.floor((new Date(target).getTime() - now) / 1000)); return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}h ${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`; }
+async function readJson(response: Response) { if (!response.ok) throw new Error("The API returned an error."); return response.json(); }
+function isStatus(value: unknown): value is Status { return typeof value === "object" && value !== null && "status" in value && "area" in value && typeof value.area === "object" && value.area !== null && "suburb" in value.area; }
 
 export default function Home() {
   const [status, setStatus] = useState<Status | null>(null);
@@ -20,7 +22,7 @@ export default function Home() {
   const [now, setNow] = useState(0);
   const [error, setError] = useState("");
 
-  useEffect(() => { Promise.all([fetch(`${API}/status/zone-2`).then((response) => response.json()), fetch(`${API}/schedules/upcoming?zoneBlockId=zone-2`).then((response) => response.json())]).then(([current, upcoming]) => { setStatus(current); setSchedules(upcoming); }).catch(() => setError("The schedule could not be loaded. Check that the API is running and try again.")); }, []);
+  useEffect(() => { Promise.all([fetch(`${API}/status/zone-2`).then(readJson), fetch(`${API}/schedules/upcoming?zoneBlockId=zone-2`).then(readJson)]).then(([current, upcoming]) => { if (!isStatus(current) || !Array.isArray(upcoming)) throw new Error("The API returned an invalid schedule response."); setStatus(current); setSchedules(upcoming); }).catch(() => setError("The schedule could not be loaded. Check that the API is running and try again.")); }, []);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
   useEffect(() => { if (!query.trim()) return; const timer = window.setTimeout(() => fetch(`${API}/locations/search?q=${encodeURIComponent(query)}`).then((response) => response.json()).then(setResults).catch(() => setResults([])), 250); return () => window.clearTimeout(timer); }, [query]);
 
