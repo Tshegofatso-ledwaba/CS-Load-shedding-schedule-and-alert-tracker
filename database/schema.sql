@@ -1,22 +1,33 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS province (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL UNIQUE
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL UNIQUE,
+  official_name TEXT, map_provider_id TEXT, latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS city_municipality (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(), province_id UUID NOT NULL REFERENCES province(id) ON DELETE CASCADE, name TEXT NOT NULL,
+  official_name TEXT, map_provider_id TEXT, latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (province_id, name)
 );
 CREATE TABLE IF NOT EXISTS area (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(), city_id UUID NOT NULL REFERENCES city_municipality(id) ON DELETE CASCADE, name TEXT NOT NULL,
+  official_name TEXT, map_provider_id TEXT, latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (city_id, name)
 );
 CREATE TABLE IF NOT EXISTS suburb (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(), area_id UUID NOT NULL REFERENCES area(id) ON DELETE CASCADE, name TEXT NOT NULL,
+  official_name TEXT, map_provider_id TEXT, latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (area_id, name)
 );
 CREATE TABLE IF NOT EXISTS zone_block (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(), suburb_id UUID NOT NULL REFERENCES suburb(id) ON DELETE CASCADE, name TEXT NOT NULL,
+  official_name TEXT, map_provider_id TEXT, latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
+  boundary_geojson JSONB, geocoder_place_id TEXT, osm_type TEXT, osm_id TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (suburb_id, name)
 );
 CREATE TABLE IF NOT EXISTS schedule (

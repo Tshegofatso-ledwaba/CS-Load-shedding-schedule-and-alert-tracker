@@ -3,12 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-maplibre-worker.js",
     "dev": "next dev -H 0.0.0.0 -p 3000",
+    "prebuild": "node scripts/copy-maplibre-worker.js",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint"
   },
   "dependencies": {
+    "maplibre-gl": "^6.11.2",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8"

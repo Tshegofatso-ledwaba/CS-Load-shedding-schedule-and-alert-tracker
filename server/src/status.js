@@ -29,6 +29,7 @@ function calculateStatus(zoneBlockId, allSchedules, now = new Date()) {
     status: active ? 'OUTAGE_ACTIVE' : 'POWER_AVAILABLE',
     label: active ? 'Outage Active' : 'Power Available',
     stage: active?.stage || upcoming?.stage || null,
+    source: active?.source || upcoming?.source || null,
     activeOutage: active,
     nextOutage: upcoming,
     countdownTarget: target?.toISOString() || null,

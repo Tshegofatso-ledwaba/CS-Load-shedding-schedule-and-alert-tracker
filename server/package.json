@@ -5,7 +5,17 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed:locations": "node scripts/seed-locations.js",
+    "db:seed:schedules": "node scripts/seed-schedules.js",
+    "test:admin-locations": "node test/admin-locations.test.js",
+    "test:locations-search": "node test/locations-search.test.js",
+    "test:nominatim": "node test/nominatim.test.js",
+    "test:schedule-admin": "node test/schedule-admin.test.js",
+    "test:status": "node test/status.test.js",
+    "test:auth": "node test/auth.test.js",
+    "test:admin-access": "node test/admin-access.test.js"
   },
   "keywords": [
     "load-shedding",
