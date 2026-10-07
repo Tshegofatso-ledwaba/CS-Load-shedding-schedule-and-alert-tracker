@@ -171,7 +171,7 @@ export default function LocationPicker({ value, onChange, onConfirm }: LocationP
       const data: { matches: PowerTrackMatch[] } = await responseJson(response);
       if (thisRequest !== matchRequestId.current) return;
       setMatches(data.matches);
-      if (!data.matches.length) setNotice("No verified PowerTrack Zone/Block is close enough to this pin. You can save this address locally, but no schedule will be shown for it.");
+      if (!data.matches.length) setNotice("This location is valid, but PowerTrack does not currently have a matching schedule area for it.");
     } catch (reason) {
       if (thisRequest === matchRequestId.current) setError(reason instanceof Error ? reason.message : "Could not check for a PowerTrack schedule area.");
     } finally {

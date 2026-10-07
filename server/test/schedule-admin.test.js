@@ -12,7 +12,7 @@ const { schedules } = require('../src/data');
   let created;
   const scheduleDate = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(new Date(Date.now() + 86400000));
+  }).format(new Date(Date.now() + 3 * 86400000));
 
   try {
     const zonesResponse = await fetch(`${base}/api/locations/zones`);

@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const { locations, schedules } = require('./data');
+const localScheduleIds = new Set();
 const { calculateStatus } = require('./status');
 const { databaseEnabled } = require('./db');
 const databaseLocations = require('./locations');
@@ -65,7 +66,31 @@ async function withDatabaseFallback(operation, fallback, label) {
 async function withScheduleFallback(operation, fallback, label) {
   if (!databaseEnabled()) return fallback();
   try {
-    return await operation();
+    const result = await operation();
+    if (Array.isArray(result) && result.length === 0) {
+      const localResult = fallback();
+      if (Array.isArray(localResult) && localResult.length > 0) return localResult;
+      return result;
+    }
+    return result;
+  } catch (error) {
+    console.warn(`Falling back to local ${label} data because the database is unavailable: ${error.message}`);
+    return fallback();
+  }
+}
+
+async function withScheduleRecordFallback(operation, fallback, label) {
+  if (!databaseEnabled()) return fallback();
+  try {
+    const result = await operation();
+    const fallbackRows = fallback();
+    if (!Array.isArray(result)) return result;
+    const localRows = result.length
+      ? fallbackRows.filter((item) => localScheduleIds.has(item.id))
+      : fallbackRows;
+    const merged = new Map(localRows.map((item) => [item.id, item]));
+    for (const item of result) merged.set(item.id, item);
+    return [...merged.values()].sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`));
   } catch (error) {
     console.warn(`Falling back to local ${label} data because the database is unavailable: ${error.message}`);
     return fallback();
@@ -137,7 +162,7 @@ function parseLocationInput(payload = {}) {
 }
 
 function appendSchedule(record) {
-  schedules.push({
+  const saved = {
     id: randomUUID(),
     zoneBlockId: record.zoneBlockId,
     stage: record.stage,
@@ -146,8 +171,10 @@ function appendSchedule(record) {
     endTime: record.endTime,
     source: record.source,
     updatedAt: new Date().toISOString(),
-  });
-  return schedules[schedules.length - 1];
+  };
+  schedules.push(saved);
+  localScheduleIds.add(saved.id);
+  return saved;
 }
 
 function findLocalZone(id) {
@@ -211,7 +238,7 @@ app.get('/api/locations/:id/children', async (req, res) => {
   }
 });
 app.get('/api/locations/:id/schedules', async (req, res) => {
-  const payload = await withScheduleFallback(
+  const payload = await withScheduleRecordFallback(
     () => databaseSchedules.listUpcoming(req.params.id),
     () => schedules.filter((item) => item.zoneBlockId === req.params.id),
     'location schedules',
@@ -221,30 +248,31 @@ app.get('/api/locations/:id/schedules', async (req, res) => {
 app.get('/api/locations/search', async (req, res) => {
   const query = String(req.query.q || '').trim().toLowerCase();
   if (!query) return res.json([]);
-  if (databaseEnabled()) {
-    try {
-      return res.json(await databaseLocations.searchAreas(query));
-    } catch (error) {
-      console.warn(`Falling back to local area search because the database is unavailable: ${error.message}`);
-    }
-  }
-  const matches = locations.zones.flatMap((zoneItem) => {
-    const suburbItem = locations.suburbs.find((item) => item.id === zoneItem.suburbId);
-    const areaItem = locations.areas.find((item) => item.id === suburbItem?.areaId);
-    if (!suburbItem || !areaItem) return [];
-    const cityItem = locations.cities.find((item) => item.id === areaItem.cityId);
-    const isMatch = [province.name, cityItem?.name, areaItem.name, suburbItem.name, zoneItem.name]
-      .some((name) => name?.toLowerCase().includes(query));
-    if (!isMatch) return [];
-    return [{
-      ...areaItem,
-      zoneBlockId: zoneItem.id,
-      zoneBlockName: zoneItem.name,
-      suburbName: suburbItem.name,
-      city: cityItem,
-      province,
-    }];
-  });
+
+  const matches = await withDatabaseFallback(
+    () => databaseLocations.searchAreas(query),
+    () => {
+      return locations.zones.flatMap((zoneItem) => {
+        const suburbItem = locations.suburbs.find((item) => item.id === zoneItem.suburbId);
+        const areaItem = locations.areas.find((item) => item.id === suburbItem?.areaId);
+        if (!suburbItem || !areaItem) return [];
+        const cityItem = locations.cities.find((item) => item.id === areaItem.cityId);
+        const isMatch = [province.name, cityItem?.name, areaItem.name, suburbItem.name, zoneItem.name]
+          .some((name) => name?.toLowerCase().includes(query));
+        if (!isMatch) return [];
+        return [{
+          ...areaItem,
+          zoneBlockId: zoneItem.id,
+          zoneBlockName: zoneItem.name,
+          suburbName: suburbItem.name,
+          city: cityItem,
+          province,
+        }];
+      });
+    },
+    'area search',
+  );
+
   return res.json(matches);
 });
 app.get('/api/location/search', geocodingLimit, async (req, res) => {
@@ -355,14 +383,14 @@ app.get('/api/locations/:id', async (req, res) => {
 });
 
 app.get('/api/schedules', async (req, res) => {
-  const payload = await withScheduleFallback(() => databaseSchedules.listSchedules(req.query.zoneBlockId), () => {
+  const payload = await withScheduleRecordFallback(() => databaseSchedules.listSchedules(req.query.zoneBlockId), () => {
     const result = schedules.filter((item) => !req.query.zoneBlockId || item.zoneBlockId === req.query.zoneBlockId);
     return result.sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`));
   }, 'schedules');
   res.json(payload);
 });
 app.get('/api/admin/schedules', authenticate, async (_req, res) => {
-  const payload = await withScheduleFallback(() => databaseSchedules.listSchedules(), () => [...schedules].sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`)), 'admin schedules');
+  const payload = await withScheduleRecordFallback(() => databaseSchedules.listSchedules(), () => [...schedules].sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`)), 'admin schedules');
   return res.json(payload);
 });
 async function saveSchedule(req, res, id = null) {
@@ -373,8 +401,8 @@ async function saveSchedule(req, res, id = null) {
     return sendError(res, 400, error instanceof Error ? error.message : 'Invalid schedule payload.');
   }
 
+  const localZone = findLocalZone(record.zoneBlockId);
   if (!databaseEnabled()) {
-    const localZone = findLocalZone(record.zoneBlockId);
     if (!localZone) return sendError(res, 400, 'The selected zone/block does not exist.');
     record.zoneBlockId = localZone.id;
     if (hasLocalOverlap(record, id)) return sendError(res, 409, 'This outage overlaps an existing schedule for the selected Zone/Block.');
@@ -390,8 +418,30 @@ async function saveSchedule(req, res, id = null) {
     const scheduleItem = id
       ? await databaseSchedules.updateSchedule(id, record)
       : await databaseSchedules.createSchedule(record);
-    if (!scheduleItem) return sendError(res, 400, 'The selected zone/block does not exist.');
-    if (scheduleItem === false) return sendError(res, 400, 'The selected zone/block does not exist.');
+    if (!scheduleItem) {
+      if (!localZone) return sendError(res, 400, 'The selected zone/block does not exist.');
+      record.zoneBlockId = localZone.id;
+      if (hasLocalOverlap(record, id)) return sendError(res, 409, 'This outage overlaps an existing schedule for the selected Zone/Block.');
+      if (id) {
+        const index = schedules.findIndex((item) => item.id === id);
+        if (index === -1) return sendError(res, 404, 'Schedule not found.');
+        schedules[index] = { ...schedules[index], ...record, updatedAt: new Date().toISOString() };
+        return res.json(schedules[index]);
+      }
+      return res.status(201).json(appendSchedule(record));
+    }
+    if (scheduleItem === false) {
+      if (!localZone) return sendError(res, 400, 'The selected zone/block does not exist.');
+      record.zoneBlockId = localZone.id;
+      if (hasLocalOverlap(record, id)) return sendError(res, 409, 'This outage overlaps an existing schedule for the selected Zone/Block.');
+      if (id) {
+        const index = schedules.findIndex((item) => item.id === id);
+        if (index === -1) return sendError(res, 404, 'Schedule not found.');
+        schedules[index] = { ...schedules[index], ...record, updatedAt: new Date().toISOString() };
+        return res.json(schedules[index]);
+      }
+      return res.status(201).json(appendSchedule(record));
+    }
     return id ? res.json(scheduleItem) : res.status(201).json(scheduleItem);
   } catch (error) {
     if (error.code === 'SCHEDULE_OVERLAP') return sendError(res, 409, error.message);
@@ -404,6 +454,12 @@ app.post('/api/schedules', authenticate, (req, res) => saveSchedule(req, res));
 app.post('/api/admin/schedules', authenticate, (req, res) => saveSchedule(req, res));
 app.put('/api/admin/schedules/:id', authenticate, (req, res) => saveSchedule(req, res, req.params.id));
 app.delete('/api/admin/schedules/:id', authenticate, async (req, res) => {
+  if (localScheduleIds.has(req.params.id)) {
+    const index = schedules.findIndex((item) => item.id === req.params.id);
+    if (index !== -1) schedules.splice(index, 1);
+    localScheduleIds.delete(req.params.id);
+    return res.json({ deleted: true });
+  }
   if (!databaseEnabled()) {
     const index = schedules.findIndex((item) => item.id === req.params.id);
     if (index === -1) return sendError(res, 404, 'Schedule not found.');
@@ -419,14 +475,14 @@ app.delete('/api/admin/schedules/:id', authenticate, async (req, res) => {
   }
 });
 app.get('/api/schedules/upcoming', async (req, res) => {
-  const payload = await withScheduleFallback(() => databaseSchedules.listUpcoming(req.query.zoneBlockId), () => {
+  const payload = await withScheduleRecordFallback(() => databaseSchedules.listUpcoming(req.query.zoneBlockId), () => {
     const now = new Date();
     return schedules.filter((item) => (!req.query.zoneBlockId || item.zoneBlockId === req.query.zoneBlockId) && new Date(`${item.date}T${item.startTime}:00+02:00`) > now).sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`));
   }, 'upcoming schedules');
   res.json(payload);
 });
 app.get('/api/schedules/history', async (req, res) => {
-  const payload = await withScheduleFallback(() => databaseSchedules.listHistory(req.query.zoneBlockId), () => {
+  const payload = await withScheduleRecordFallback(() => databaseSchedules.listHistory(req.query.zoneBlockId), () => {
     const now = new Date();
     return schedules.filter((item) => (!req.query.zoneBlockId || item.zoneBlockId === req.query.zoneBlockId) && new Date(`${item.date}T${item.endTime}:00+02:00`) < now);
   }, 'schedule history');
@@ -479,9 +535,10 @@ app.post('/api/auth/login', async (req, res) => {
 });
 app.post('/api/auth/register', async (req, res) => {
   const { email, password, registrationKey } = req.body || {};
-  if (!email || !password || !registrationKey) return sendError(res, 400, 'Email, password, and registration key are required.');
-  if (!ADMIN_REGISTRATION_KEY || registrationKey !== ADMIN_REGISTRATION_KEY) return sendError(res, 403, 'Administrator registration is not enabled.');
-  if (!databaseEnabled()) return sendError(res, 503, 'Administrator registration requires the database.');
+  if (!email || !password) return sendError(res, 400, 'Email and password are required.');
+  if (!databaseEnabled()) return sendError(res, 503, 'Administrator registration requires a configured database. Set DATABASE_URL on the server.');
+  if (!ADMIN_REGISTRATION_KEY) return sendError(res, 503, 'Administrator registration is not configured. Set ADMIN_REGISTRATION_KEY on the server.');
+  if (registrationKey !== ADMIN_REGISTRATION_KEY) return sendError(res, 403, 'The administrator registration key is missing or invalid.');
   if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 12) return sendError(res, 400, 'Use a valid email and a password of at least 12 characters.');
   const administrator = await createAdministrator(email.trim().toLowerCase(), password);
   if (!administrator) return sendError(res, 409, 'An administrator with that email already exists.');

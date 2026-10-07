@@ -14,6 +14,7 @@
     "test:nominatim": "node test/nominatim.test.js",
     "test:schedule-admin": "node test/schedule-admin.test.js",
     "test:status": "node test/status.test.js",
+    "test:admin-registration": "node test/admin-registration.test.js",
     "test:auth": "node test/auth.test.js",
     "test:admin-access": "node test/admin-access.test.js"
   },

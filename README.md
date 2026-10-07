@@ -45,7 +45,7 @@ Admin Location Management is available at `/admin/locations`. Administrators sea
 
 Schedule creation, update, and deletion are protected admin operations. The API validates the persisted zone, stage, date, and time range, and rejects overlapping outage windows for the same block. Locations with attached schedules cannot be deleted.
 
-Administrator registration is available from the admin login screen only when the server has an `ADMIN_REGISTRATION_KEY` environment variable. The key is never sent to the browser or committed. Registration requires the database and stores only a bcrypt password hash.
+Administrator registration is available from the admin login screen when the server has both `DATABASE_URL` and `ADMIN_REGISTRATION_KEY` configured. Set both in `server/.env` for local use or in the API host's environment settings for deployment. Keep the registration key server-side; it is never sent to the browser or committed. Registration stores administrator accounts in the database and saves only a bcrypt password hash. The registration key can be rotated by changing the server environment variable.
 
 ## Checks
 

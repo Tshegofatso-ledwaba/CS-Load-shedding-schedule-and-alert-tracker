@@ -15,6 +15,21 @@ function scheduleTimestamp(item, time) {
 function calculateStatus(zoneBlockId, allSchedules, now = new Date()) {
   const zoneSchedules = allSchedules.filter((item) => item.zoneBlockId === zoneBlockId);
   const current = localParts(now);
+  if (zoneSchedules.length === 0) {
+    return {
+      status: 'NO_SCHEDULE',
+      label: 'No outage schedule available',
+      stage: null,
+      source: null,
+      activeOutage: null,
+      nextOutage: null,
+      countdownTarget: null,
+      timezone: TIME_ZONE,
+      localDate: current.date,
+      lastUpdated: now.toISOString(),
+    };
+  }
+
   const active = zoneSchedules.find((item) => {
     const start = scheduleTimestamp(item, item.startTime);
     const end = scheduleTimestamp(item, item.endTime);
@@ -25,9 +40,11 @@ function calculateStatus(zoneBlockId, allSchedules, now = new Date()) {
     .sort((a, b) => scheduleTimestamp(a, a.startTime) - scheduleTimestamp(b, b.startTime))[0] || null;
   const target = active ? scheduleTimestamp(active, active.endTime) : upcoming ? scheduleTimestamp(upcoming, upcoming.startTime) : null;
 
+  const nextStatus = active ? 'OUTAGE_ACTIVE' : upcoming ? 'UPCOMING_OUTAGE' : 'POWER_AVAILABLE';
+
   return {
-    status: active ? 'OUTAGE_ACTIVE' : 'POWER_AVAILABLE',
-    label: active ? 'Outage Active' : 'Power Available',
+    status: nextStatus,
+    label: active ? 'Outage Active' : upcoming ? 'Upcoming outage' : 'Power Available',
     stage: active?.stage || upcoming?.stage || null,
     source: active?.source || upcoming?.source || null,
     activeOutage: active,

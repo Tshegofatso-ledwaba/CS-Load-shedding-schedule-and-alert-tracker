@@ -39,7 +39,7 @@ const { databaseEnabled, query } = require('../src/db');
       const location = await fetch(`http://127.0.0.1:${port}/api/locations/${zone.rows[0].id}`).then((response) => response.json());
       assert.strictEqual(location.id, zone.rows[0].id);
       const status = await fetch(`http://127.0.0.1:${port}/api/status/${zone.rows[0].id}`).then((response) => response.json());
-      assert.strictEqual(status.status, 'POWER_AVAILABLE');
+      assert.strictEqual(status.status, 'NO_SCHEDULE');
       assert.strictEqual(status.nextOutage, null);
       const upcoming = await fetch(`http://127.0.0.1:${port}/api/schedules/upcoming?zoneBlockId=${zone.rows[0].id}`).then((response) => response.json());
       assert.deepStrictEqual(upcoming, []);
