@@ -118,9 +118,18 @@ async function adminDashboard() {
     FROM schedule
   `);
   const recent = await query(`
-    SELECT id::text AS id, zone_block_id::text AS "zoneBlockId", date::text AS date,
-           to_char(start_time, 'HH24:MI') AS "startTime", to_char(end_time, 'HH24:MI') AS "endTime", stage, source
-    FROM schedule ORDER BY updated_at DESC, date DESC, start_time DESC LIMIT 4
+    SELECT sc.id::text AS id, sc.zone_block_id::text AS "zoneBlockId",
+           COALESCE(NULLIF(z.official_name, ''), z.name) AS "locationName",
+           NULLIF(concat_ws(' · ', CASE WHEN s.name IS DISTINCT FROM a.name THEN s.name END, a.name, c.name, p.name), '') AS "locationPath",
+           sc.date::text AS date, to_char(sc.start_time, 'HH24:MI') AS "startTime",
+           to_char(sc.end_time, 'HH24:MI') AS "endTime", sc.stage, sc.source
+    FROM schedule sc
+    LEFT JOIN zone_block z ON z.id = sc.zone_block_id
+    LEFT JOIN suburb s ON s.id = z.suburb_id
+    LEFT JOIN area a ON a.id = s.area_id
+    LEFT JOIN city_municipality c ON c.id = a.city_id
+    LEFT JOIN province p ON p.id = c.province_id
+    ORDER BY sc.updated_at DESC, sc.date DESC, sc.start_time DESC LIMIT 4
   `);
   return { stats: result.rows[0], recentUpdates: recent.rows };
 }

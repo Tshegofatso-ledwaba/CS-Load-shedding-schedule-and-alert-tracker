@@ -547,6 +547,23 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/logout', (_req, res) => res.json({ message: 'Signed out.' }));
 app.get('/api/admin/dashboard', authenticate, async (_req, res) => {
   if (!databaseEnabled()) {
+    const recentUpdates = schedules.slice(-4).reverse().map((schedule) => {
+      const matchedZone = locations.zones.find((item) => item.id === schedule.zoneBlockId);
+      const matchedSuburb = matchedZone && locations.suburbs.find((item) => item.id === matchedZone.suburbId);
+      const matchedArea = matchedSuburb && locations.areas.find((item) => item.id === matchedSuburb.areaId);
+      const matchedCity = matchedArea && locations.cities.find((item) => item.id === matchedArea.cityId);
+      const matchedProvince = matchedCity && locations.provinces.find((item) => item.id === matchedCity.provinceId);
+      const locationPath = matchedSuburb && matchedArea && matchedCity && matchedProvince
+        ? [matchedSuburb.name, matchedArea.name, matchedCity.name, matchedProvince.name]
+          .filter((name, index, names) => index === 0 || name !== names[index - 1])
+          .join(' · ')
+        : null;
+      return {
+        ...schedule,
+        locationName: matchedZone?.name || null,
+        locationPath,
+      };
+    });
     return res.json({
       stats: {
         totalAreas: locations.areas.length,
@@ -554,7 +571,7 @@ app.get('/api/admin/dashboard', authenticate, async (_req, res) => {
         totalSchedules: schedules.length,
         upcomingSchedules: schedules.filter((item) => new Date(`${item.date}T${item.startTime}:00+02:00`) > new Date()).length,
       },
-      recentUpdates: schedules.slice(-4).reverse(),
+      recentUpdates,
     });
   }
   try {

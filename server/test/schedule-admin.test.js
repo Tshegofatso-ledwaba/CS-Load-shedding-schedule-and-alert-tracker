@@ -99,6 +99,15 @@ const { schedules } = require('../src/data');
     assert.strictEqual(updateResponse.status, 200, JSON.stringify(updated));
     assert.strictEqual(updated.stage, 6);
 
+    const dashboardResponse = await fetch(`${base}/api/admin/dashboard`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const dashboard = await dashboardResponse.json();
+    assert.strictEqual(dashboardResponse.status, 200, JSON.stringify(dashboard));
+    assert.ok(Array.isArray(dashboard.recentUpdates) && dashboard.recentUpdates.length > 0);
+    assert.ok(dashboard.recentUpdates.some((item) => typeof item.locationName === 'string' && item.locationName.length > 0));
+    assert.ok(dashboard.recentUpdates.some((item) => typeof item.locationPath === 'string' && item.locationPath.length > 0));
+
     const deleteResponse = await fetch(`${base}/api/admin/schedules/${created.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
