@@ -55,7 +55,36 @@ export default function AdminDashboard() {
   const detailTitle = activeMetric ? `${activeMetric} details` : "Dashboard details";
   const closeDetails = () => dialogRef.current?.close();
 
-  return <main className="app-shell"><header className="topbar"><Link className="brand" href="/"><span className="brand-mark">P</span><span>POWERTRACK</span></Link><div className="admin-nav"><Link className="nav" href="/admin/locations">Manage locations</Link><button className="nav" onClick={signOut}>Sign out</button></div></header><section className="admin-wrap"><div className="eyebrow">Operations overview</div><h1 style={{ fontSize: 56 }}>Dashboard.</h1><p className="intro">A small, useful pulse check on the schedule data your community sees.</p>{error ? <div className="card error" style={{ marginTop: 30 }}>{error}</div> : !data ? <div className="card loading" style={{ marginTop: 30 }}>Loading statistics...</div> : <><div className="stats-grid">{metricCards.map(([label, value]) => <button className="card stats-card" key={label} type="button" onClick={() => setActiveMetric(label)} aria-haspopup="dialog"><span className="status-label">{label}</span><strong className="stat-number">{value}</strong><span className="stats-card-hint">View details</span></button>)}</div><div className="card" style={{ marginTop: 18 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="section-title">Schedule controls</h2><button className="button admin-button" type="button" onClick={() => router.push("/admin/schedules")}>Manage schedules</button></div><p className="intro" style={{ marginTop: 8 }}>Open the outage schedule workflow and review the next operational updates.</p></div><div className="card" style={{ marginTop: 18 }}><h2 className="section-title">Recent schedule updates</h2><div className="admin-list">{data.recentUpdates.map((item) => <div className="admin-row" key={item.id}><span>{item.date} · {item.startTime} – {item.endTime}</span><strong>Stage {item.stage} · {item.source || "Unknown source"}</strong></div>)}</div></div></>}</section>
+  return <main className="app-shell">
+    <header className="topbar">
+      <Link className="brand" href="/"><span className="brand-mark">P</span><span>POWERTRACK</span></Link>
+      <nav className="admin-nav" aria-label="Admin navigation">
+        <Link className="nav" href="/admin/dashboard" aria-current="page">Dashboard</Link>
+        <Link className="nav" href="/admin/locations">Locations</Link>
+        <Link className="nav" href="/admin/schedules">Schedules</Link>
+        <button className="nav" onClick={signOut}>Sign out</button>
+      </nav>
+    </header>
+    <section className="admin-wrap">
+      <div className="eyebrow">Operations overview</div>
+      <h1 style={{ fontSize: 56 }}>Dashboard.</h1>
+      <p className="intro">A small, useful pulse check on the schedule data your community sees.</p>
+      {error ? <div className="card error" style={{ marginTop: 30 }} role="alert">{error}</div> : !data ? <div className="card loading" style={{ marginTop: 30 }}>Loading statistics...</div> : <>
+        <div className="stats-grid">{metricCards.map(([label, value]) => <button className="card stats-card" key={label} type="button" onClick={() => setActiveMetric(label)} aria-haspopup="dialog"><span className="status-label">{label}</span><strong className="stat-number">{value}</strong><span className="stats-card-hint">View details</span></button>)}</div>
+        <div className="card" style={{ marginTop: 18 }}>
+          <h2 className="section-title">Quick actions</h2>
+          <p className="intro" style={{ marginTop: 8 }}>Manage saved places or publish and review outage schedules.</p>
+          <div className="admin-quick-actions">
+            <Link className="button admin-button" href="/admin/locations">Manage locations</Link>
+            <Link className="button admin-button" href="/admin/schedules">Manage schedules</Link>
+          </div>
+        </div>
+        <div className="card" style={{ marginTop: 18 }}>
+          <h2 className="section-title">Recent schedule updates</h2>
+          <div className="admin-list">{data.recentUpdates.map((item) => <div className="admin-row" key={item.id}><span>{item.date} · {item.startTime} – {item.endTime}</span><strong>Stage {item.stage} · {item.source || "Unknown source"}</strong></div>)}</div>
+        </div>
+      </>}
+    </section>
     <dialog ref={dialogRef} className="admin-detail-dialog" aria-labelledby="admin-detail-title" onClose={() => { setActiveMetric(null); setDetails({ status: "idle" }); }}>
       <div className="admin-detail-header"><div><div className="eyebrow">Operations overview</div><h2 id="admin-detail-title" className="section-title">{detailTitle}</h2></div><button className="saved-remove" type="button" onClick={closeDetails} aria-label="Close details">×</button></div>
       <div className="admin-detail-content" aria-live="polite">

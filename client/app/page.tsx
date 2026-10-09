@@ -12,6 +12,7 @@ type Status = { status: string; label: string; stage: number | null; source?: st
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
 function formatDate(date: string) { return new Intl.DateTimeFormat("en-ZA", { weekday: "short", day: "2-digit", month: "short" }).format(new Date(`${date}T12:00:00`)); }
+function formatCountdownTarget(target: string) { return new Intl.DateTimeFormat("en-ZA", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" }).format(new Date(target)); }
 function countdown(target: string | null, now: number) { if (!target) return "--"; const seconds = Math.max(0, Math.floor((new Date(target).getTime() - now) / 1000)); return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}h ${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`; }
 async function readJson(response: Response) { if (!response.ok) throw new Error("The API returned an error."); return response.json(); }
 function isStatus(value: unknown): value is Status { return typeof value === "object" && value !== null && "status" in value && "area" in value && typeof value.area === "object" && value.area !== null && "suburb" in value.area; }
@@ -37,29 +38,6 @@ export default function Home() {
     UPCOMING_OUTAGE: "A scheduled outage is approaching.",
     POWER_AVAILABLE: "Power is available right now.",
   }[status.status as StatusKey] ?? "PowerTrack status is unavailable." : "";
-
-  const nextChangeLabel = status ? {
-    NO_SCHEDULE: "No outage schedule available",
-    OUTAGE_ACTIVE: "Power returns at",
-    UPCOMING_OUTAGE: "Next outage",
-    POWER_AVAILABLE: "Next interruption",
-  }[status.status as StatusKey] ?? "Next change" : "Next change";
-
-  const nextChangeTime = status ? (status.status === "NO_SCHEDULE" ? "--:--" : status.activeOutage?.endTime || status.nextOutage?.startTime || "--:--") : "--:--";
-
-  const detailTitle = status ? {
-    NO_SCHEDULE: "Schedule unavailable",
-    OUTAGE_ACTIVE: "Expected return",
-    UPCOMING_OUTAGE: "Next scheduled outage",
-    POWER_AVAILABLE: "Next change",
-  }[status.status as StatusKey] ?? "Next change" : "Next change";
-
-  const detailBody = status && status.status === "NO_SCHEDULE" ? "Try another location or check back when a schedule is available." : status && status.countdownTarget ? new Intl.DateTimeFormat("en-ZA", {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Africa/Johannesburg",
-  }).format(new Date(status.countdownTarget)) : "No scheduled change";
 
   useEffect(() => {
     if (!zoneBlockId) return;
@@ -179,14 +157,17 @@ export default function Home() {
         </section>}
         {selectedArea && !selectedArea.zoneBlockId ? <article className="card location-unmatched" role="status"><div className="status-label">Physical location selected</div><h2 className="section-title">No verified PowerTrack schedule match</h2><p className="muted">{selectedArea.displayName || selectedArea.name} is saved locally, but its coordinates are not close to a verified Zone/Block. No outage schedule is shown for this address.</p></article> : pendingAddress && !selectedArea ? <div className="card loading" style={{ marginTop: 24 }}>Confirm the selected pin to check its PowerTrack schedule area.</div> : error ? <div className="card error" role="alert" style={{ marginTop: 24 }}>{error}</div> : !status ? <div className="card loading" style={{ marginTop: 24 }}>Reading the grid...</div> : <>
           <div className="layout-grid">
-            <article className={`card status-card ${status.status === "OUTAGE_ACTIVE" ? "active" : ""}`}>
-              <div><div className="status-label">Current power status</div><div className={`status-value ${status.status === "OUTAGE_ACTIVE" ? "active" : ""}`}>{status.label}</div><p className="status-summary">{statusSummaryText}</p></div>
-              <div><div className="status-meta"><span className="status-dot" /> {status.status === "NO_SCHEDULE" ? "Schedule unavailable" : `Stage ${status.stage || "none"}`} <span className="muted">| {status.status === "NO_SCHEDULE" ? "No outage schedule available" : `${nextChangeLabel} ${nextChangeTime}`}</span></div><div className="status-detail"><span className="status-detail-icon">{status.status === "OUTAGE_ACTIVE" ? "↗" : status.status === "NO_SCHEDULE" ? "—" : "→"}</span><span><strong>{status.status === "NO_SCHEDULE" ? "Schedule unavailable" : detailTitle}</strong><br /><span className="muted">{detailBody}</span></span></div><div className="status-source">{status.status === "NO_SCHEDULE" ? "No schedule data available" : status.source ? (status.source === "PREDICTED" ? "Predicted schedule" : status.source === "EXTERNAL" ? "External schedule" : "Official schedule") : "Live schedule"} · {status.timezone}</div></div>
+            <article className={`card status-card ${status.status === "OUTAGE_ACTIVE" ? "active" : ""}`} aria-label={`Current power status: ${status.label}`}>
+              <div><div className="status-label">Current power status</div><div className={`status-value ${status.status === "OUTAGE_ACTIVE" ? "active" : ""}`} role="status">{status.label}</div><p className="status-summary">{statusSummaryText}</p></div>
+              <div>
+                <div className="status-meta"><span className="status-dot" /> {status.status === "NO_SCHEDULE" ? "Schedule unavailable" : `Stage ${status.stage || "none"}`}</div>
+                <div className="status-countdown" aria-label={status.status === "OUTAGE_ACTIVE" ? "Time until power returns" : "Time until next outage"}><span>{status.status === "OUTAGE_ACTIVE" ? "Power back in" : status.status === "NO_SCHEDULE" ? "Countdown unavailable" : "Next outage in"}</span><div className="status-countdown-value"><strong>{status.status === "NO_SCHEDULE" ? "--" : countdown(status.countdownTarget, now)}</strong>{status.status !== "NO_SCHEDULE" && status.countdownTarget && <time className="status-countdown-target" dateTime={status.countdownTarget}>{formatCountdownTarget(status.countdownTarget)} SAST</time>}</div></div>
+                <div className="status-source">{status.status === "NO_SCHEDULE" ? "No schedule data available" : status.source ? (status.source === "PREDICTED" ? "Predicted schedule" : status.source === "EXTERNAL" ? "External schedule" : "Official schedule") : "Live schedule"} · {status.timezone}</div>
+              </div>
             </article>
             <div className="side-stack">
               <article className="card location-card"><div className="status-label">Verified PowerTrack Zone/Block</div><div className="location-name">{selectedArea?.zoneBlockName || status.area.suburb}</div><div className="location-path">{selectedArea ? [selectedArea.suburbName, selectedArea.name, selectedArea.city.name, selectedArea.province.name].filter(Boolean).join(" · ") : `${status.area.city} · ${status.area.province} · ${status.area.name}`}</div>{selectedArea?.latitude !== undefined && selectedArea.longitude !== undefined && <p className="muted geo-coordinates">{selectedArea.latitude.toFixed(5)}, {selectedArea.longitude.toFixed(5)}</p>}</article>
               <article className="card saved-card"><div className="saved-header"><div><div className="status-label">Pinned places</div><h2 className="section-title">Quick check</h2></div><span className="pin-mark">•</span></div><div className="saved-list">{(["Home", "Work"] as const).map((slot) => { const saved = savedLocations.find((item) => item.slot === slot); return <div className="saved-row" key={slot}><span className="saved-icon">{slot === "Home" ? "⌂" : "▣"}</span><span className="saved-copy"><strong>{slot}</strong><small>{saved ? saved.displayName || saved.name : "Not saved yet"}</small></span>{saved ? <><button className="saved-open" onClick={() => void chooseLocation(saved)}>Check</button><button className="saved-remove" onClick={() => removeLocation(slot)} aria-label={`Remove ${slot}`}>×</button></> : <span className="muted">—</span>}</div>; })}</div></article>
-              <article className="card next-card"><div><div className="status-label">Up next</div><div className="next-time">{status.status === "NO_SCHEDULE" ? "No outage scheduled" : status.nextOutage ? `${status.nextOutage.startTime} – ${status.nextOutage.endTime}` : "No outage planned"}</div><div className="muted">{status.status === "NO_SCHEDULE" ? "PowerTrack does not currently have schedule data for this location." : status.nextOutage ? `${formatDate(status.nextOutage.date)} · Stage ${status.nextOutage.stage}${status.nextOutage.source ? ` · ${status.nextOutage.source === "PREDICTED" ? "Predicted" : status.nextOutage.source === "EXTERNAL" ? "External" : "Official"}` : ""}` : "Your power is clear"}</div></div><div className="countdown"><div className="status-label">Countdown</div><div className="countdown-value">{status.status === "NO_SCHEDULE" ? "--" : countdown(status.countdownTarget, now)}</div></div></article>
             </div>
           </div>
           <section className="schedule-section" id="schedule"><div className="schedule-header"><h2 className="section-title">Upcoming schedule</h2><span className="muted">{status.area.name} · Africa/Johannesburg</span></div><div className="schedule-list">{schedules.length === 0 ? <div className="card muted">{status.status === "NO_SCHEDULE" ? "No outage schedule available for this location." : "No schedules available for this area."}</div> : schedules.slice(0, 6).map((item) => <article className="schedule-item" key={item.id}><div className="schedule-date">{formatDate(item.date)}</div><div className="schedule-time">{item.startTime} – {item.endTime}</div><div className="stage">Stage {item.stage}</div>{item.source && <div className="stage source">{item.source === "PREDICTED" ? "Predicted" : item.source === "EXTERNAL" ? "External" : "Official"}</div>}</article>)}</div></section>

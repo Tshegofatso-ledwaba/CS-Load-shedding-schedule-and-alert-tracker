@@ -50,6 +50,7 @@ export default function AdminLocations() {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingLocationId, setDeletingLocationId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -125,7 +126,7 @@ export default function AdminLocations() {
       city: feature.address.municipality || feature.address.city || feature.address.town || "",
       area: feature.address.area || "",
       suburb: feature.address.suburb || "",
-      zoneBlock: feature.address.zoneBlock || "",
+      zoneBlock: "",
     });
     setMapResults([]);
     setNotice("");
@@ -219,6 +220,8 @@ export default function AdminLocations() {
     const accessToken = requireAccessToken();
     if (!accessToken) return;
     setError("");
+    setNotice("");
+    setDeletingLocationId(location.zoneBlockId);
     try {
       const response = await fetch(`${API}/admin/locations/${location.zoneBlockId}`, { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } });
       if (response.status === 401 || response.status === 403) {
@@ -238,6 +241,8 @@ export default function AdminLocations() {
       await loadLocations(filter);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not delete location.");
+    } finally {
+      setDeletingLocationId(null);
     }
   }
 
@@ -271,14 +276,14 @@ export default function AdminLocations() {
 
   const focusId = selectedFeature ? `osm:${selectedFeature.osmType || "place"}/${selectedFeature.osmId || selectedFeature.geocoderPlaceId || "selected"}` : selectedLocation?.zoneBlockId || "";
 
-  return <main className="app-shell"><header className="topbar"><Link className="brand" href="/"><span className="brand-mark">P</span><span>POWERTRACK</span></Link><nav className="admin-nav"><Link className="nav" href="/admin/dashboard">Dashboard</Link><Link className="nav" href="/admin/schedules">Schedules</Link><button className="nav" onClick={signOut}>Sign out</button></nav></header>
+  return <main className="app-shell"><header className="topbar"><Link className="brand" href="/"><span className="brand-mark">P</span><span>POWERTRACK</span></Link><nav className="admin-nav" aria-label="Admin navigation"><Link className="nav" href="/admin/dashboard">Dashboard</Link><Link className="nav" href="/admin/locations" aria-current="page">Locations</Link><Link className="nav" href="/admin/schedules">Schedules</Link><button className="nav" onClick={signOut}>Sign out</button></nav></header>
     <section className="geo-admin"><div className="eyebrow">Canonical location database</div><h1>Map the places.</h1><p className="intro">Verified PowerTrack locations are stored once and shared by administrators and the public.</p>
       {error && <div className="card error geo-message" role="alert">{error}</div>}{notice && <div className="geo-notice" role="status">{notice}</div>}
       <div className="geo-grid"><div className="geo-main"><form className="geo-search" onSubmit={searchMap}><label htmlFor="map-place-search">Find a South African place</label><div className="geo-search-row"><input id="map-place-search" value={mapQuery} onChange={(event) => setMapQuery(event.target.value)} placeholder="Search by address or place name" /><button className="button" disabled={searching}>{searching ? "Searching..." : "Search address"}</button></div></form>
           {mapResults.length > 0 && <div className="geo-results" aria-label="Address search results">{mapResults.map((feature) => <button type="button" className="geo-result" key={`${feature.osmType}-${feature.osmId}-${feature.geocoderPlaceId}`} onClick={() => chooseFeature(feature)}><strong>{feature.displayName}</strong><span>{[feature.address.suburb, feature.address.area, feature.address.city || feature.address.town, feature.address.municipality, feature.address.province].filter(Boolean).join(", ")}</span></button>)}</div>}
           <div className="geo-map-frame"><LocationMap points={points} focusId={focusId} selectedPoint={selectedFeature ? { latitude: selectedFeature.latitude, longitude: selectedFeature.longitude } : null} onSelect={mapSelect} onMapClick={(latitude, longitude) => void reverseGeocode(latitude, longitude)} onMarkerMoved={(latitude, longitude) => void reverseGeocode(latitude, longitude)} /></div><div className="map-attribution">© OpenStreetMap contributors</div>
           <div className="locations-toolbar"><h2 className="section-title">PowerTrack locations</h2><input aria-label="Filter PowerTrack locations" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter saved locations" /></div>
-          <div className="geo-location-list" aria-live="polite">{loading ? <p className="muted">Loading saved locations...</p> : locations.length === 0 ? <p className="muted">No saved locations match. Search a South African place above to add one.</p> : locations.map((location) => <article className={`geo-location-row ${selectedLocation?.zoneBlockId === location.zoneBlockId ? "is-selected" : ""}`} key={location.zoneBlockId}><button type="button" className="geo-location-select" onClick={() => selectSavedLocation(location)}><strong>{location.zoneBlockName}</strong><span>{location.suburbName} · {location.areaName} · {location.cityName} · {location.provinceName}</span></button><button type="button" className="saved-open" onClick={() => { selectSavedLocation(location); router.push(`/admin/schedules?zoneBlockId=${encodeURIComponent(location.zoneBlockId)}`); }}>Create schedule</button></article>)}</div>
+          <div className="geo-location-list" aria-live="polite">{loading ? <p className="muted">Loading saved locations...</p> : locations.length === 0 ? <p className="muted">No saved locations match. Search a South African place above to add one.</p> : locations.map((location) => <article className={`geo-location-row ${selectedLocation?.zoneBlockId === location.zoneBlockId ? "is-selected" : ""}`} key={location.zoneBlockId}><button type="button" className="geo-location-select" onClick={() => selectSavedLocation(location)}><strong>{location.zoneBlockName}</strong><span>{location.suburbName} · {location.areaName} · {location.cityName} · {location.provinceName}</span></button><button type="button" className="saved-open" onClick={() => { selectSavedLocation(location); router.push(`/admin/schedules?zoneBlockId=${encodeURIComponent(location.zoneBlockId)}`); }}>Create schedule</button><button type="button" className="danger-button" onClick={() => void deleteLocation(location)} disabled={deletingLocationId !== null} aria-label={`Delete ${location.zoneBlockName}, ${location.suburbName}`} title="Delete this location">{deletingLocationId === location.zoneBlockId ? "Deleting..." : "Delete"}</button></article>)}</div>
         </div>
         <aside className="geo-detail"><div className="status-label">Location hierarchy</div><h2 className="section-title">{selectedFeature ? selectedFeature.displayName : selectedLocation ? selectedLocation.zoneBlockName : "Select a place"}</h2>
           {selectedFeature && <p className="muted geo-coordinates">OpenStreetMap · {selectedFeature.latitude.toFixed(5)}, {selectedFeature.longitude.toFixed(5)}</p>}
@@ -289,7 +294,7 @@ export default function AdminLocations() {
             {editingLocation && selectedFeature && <p className="muted">This OpenStreetMap place will be applied to the selected existing Zone/Block.</p>}
             <button className="button admin-button" type="submit" disabled={saving || (!selectedFeature && !selectedLocation)}>{saving ? "Saving..." : editingLocation ? "Update location" : selectedFeature ? "Create location" : "Save changes"}</button>
           </form>
-          {selectedLocation && <div className="geo-detail-actions"><button className="button" type="button" onClick={createSchedule}>Create schedule</button><button className="danger-button" type="button" onClick={() => void deleteLocation(selectedLocation)}>Delete zone/block</button></div>}
+          {selectedLocation && <div className="geo-detail-actions"><button className="button" type="button" onClick={createSchedule}>Create schedule</button><button className="danger-button" type="button" onClick={() => void deleteLocation(selectedLocation)} disabled={deletingLocationId !== null}>{deletingLocationId === selectedLocation.zoneBlockId ? "Deleting..." : "Delete zone/block"}</button></div>}
           <p className="muted geo-policy">All location changes are stored in the PowerTrack database. Public users can search these records but cannot change them.</p>
         </aside></div>
     </section>
