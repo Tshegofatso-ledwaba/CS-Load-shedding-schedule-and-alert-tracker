@@ -560,7 +560,7 @@ app.get('/api/admin/dashboard', authenticate, async (_req, res) => {
         : null;
       return {
         ...schedule,
-        locationName: matchedZone?.name || null,
+        locationName: matchedZone?.officialName || matchedZone?.name || null,
         locationPath,
       };
     });

@@ -147,6 +147,7 @@ h1 { max-width: 650px; margin-top: 12px; font-size: clamp(42px, 6vw, 76px); line
 .geo-coordinates { margin-top: 9px; }
 .geo-hierarchy-readout { padding: 12px; background: var(--surface-soft); color: var(--ink); font: 13px/1.7 Arial, sans-serif; }
 .geo-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.geo-delete-error { margin: 0; padding: 10px 12px; border: 1px solid rgb(255 181 155 / 35%); border-radius: 9px; background: rgb(164 60 32 / 12%); }
 .danger-button { border: 1px solid #b45c42; border-radius: 8px; background: transparent; color: #ffb59b; padding: 10px 12px; font: 700 12px Arial, sans-serif; }
 .geo-policy { margin-top: 18px; }
 .schedule-location-preview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, .8fr); gap: 16px; align-items: center; margin-top: 14px; padding: 16px; background: var(--surface-soft); border: 1px solid var(--border); }

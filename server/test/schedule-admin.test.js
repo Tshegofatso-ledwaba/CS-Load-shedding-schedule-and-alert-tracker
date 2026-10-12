@@ -105,8 +105,15 @@ const { schedules } = require('../src/data');
     const dashboard = await dashboardResponse.json();
     assert.strictEqual(dashboardResponse.status, 200, JSON.stringify(dashboard));
     assert.ok(Array.isArray(dashboard.recentUpdates) && dashboard.recentUpdates.length > 0);
-    assert.ok(dashboard.recentUpdates.some((item) => typeof item.locationName === 'string' && item.locationName.length > 0));
-    assert.ok(dashboard.recentUpdates.some((item) => typeof item.locationPath === 'string' && item.locationPath.length > 0));
+    if (!databaseEnabled()) {
+      const recentUpdate = dashboard.recentUpdates.find((item) => item.id === created.id);
+      assert.ok(recentUpdate, 'Expected the new schedule in recent dashboard updates.');
+      assert.strictEqual(recentUpdate.locationName, 'Zone 2');
+      assert.match(recentUpdate.locationPath, /Soshanguve Block F/);
+    } else {
+      assert.ok(dashboard.recentUpdates.some((item) => typeof item.locationName === 'string' && item.locationName.length > 0), 'Expected recent updates to include a place name.');
+      assert.ok(dashboard.recentUpdates.some((item) => typeof item.locationPath === 'string' && item.locationPath.length > 0), 'Expected recent updates to include the location hierarchy.');
+    }
 
     const deleteResponse = await fetch(`${base}/api/admin/schedules/${created.id}`, {
       method: 'DELETE',
