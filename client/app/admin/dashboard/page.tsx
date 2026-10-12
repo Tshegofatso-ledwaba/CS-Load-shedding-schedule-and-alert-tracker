@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 type DashboardData = { stats: { totalAreas: number; totalZones: number; totalSchedules: number; upcomingSchedules: number }; recentUpdates: ScheduleItem[] };
-type ScheduleItem = { id: string; zoneBlockId?: string; date: string; startTime: string; endTime: string; stage: number; source?: string };
+type ScheduleItem = { id: string; zoneBlockId?: string; locationName?: string | null; locationPath?: string | null; date: string; startTime: string; endTime: string; stage: number; source?: string };
 type AreaItem = { id: string; name: string; cityId?: string; city?: { name: string }; province?: { name: string } };
 type ZoneItem = { zoneBlockId: string; zoneBlockName: string; suburbName: string; areaName: string; cityName: string; provinceName: string };
 type Metric = "Areas" | "Zones" | "Schedules" | "Upcoming";
@@ -81,7 +81,7 @@ export default function AdminDashboard() {
         </div>
         <div className="card" style={{ marginTop: 18 }}>
           <h2 className="section-title">Recent schedule updates</h2>
-          <div className="admin-list">{data.recentUpdates.map((item) => <div className="admin-row" key={item.id}><span>{item.date} · {item.startTime} – {item.endTime}</span><strong>Stage {item.stage} · {item.source || "Unknown source"}</strong></div>)}</div>
+          <div className="admin-list">{data.recentUpdates.map((item) => <div className="admin-row" key={item.id}><span><strong>{item.locationName || "Location unavailable"}</strong><small>{item.locationPath || "Place details unavailable"}</small></span><span>{item.date} · {item.startTime} – {item.endTime}</span><strong>Stage {item.stage} · {item.source || "Unknown source"}</strong></div>)}</div>
         </div>
       </>}
     </section>

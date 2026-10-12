@@ -11,6 +11,7 @@ const { databaseEnabled, query } = require('../src/db');
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
   const provinceName = `Location Test Province ${suffix}`;
   let zoneBlockId;
+  let deletableZoneBlockId;
   let scheduleId;
 
   try {
@@ -121,6 +122,24 @@ const { databaseEnabled, query } = require('../src/db');
     const protectedDelete = await fetch(`${base}/api/admin/locations/${zoneBlockId}`, { method: 'DELETE', headers });
     assert.strictEqual(protectedDelete.status, 409);
 
+    const deletablePayload = {
+      ...payload,
+      geocoderPlaceId: `node/deletable/${suffix}`,
+      osmId: `deletable-${suffix}`,
+      officialName: `Deletable place ${suffix}`,
+      area: { name: `Deletable Area ${suffix}` },
+      suburb: { name: `Deletable Suburb ${suffix}` },
+      zoneBlock: { name: `Deletable Zone ${suffix}` },
+    };
+    const deletableResponse = await fetch(`${base}/api/admin/locations`, { method: 'POST', headers, body: JSON.stringify(deletablePayload) });
+    const deletable = await deletableResponse.json();
+    assert.strictEqual(deletableResponse.status, 201, JSON.stringify(deletable));
+    deletableZoneBlockId = deletable.zoneBlockId;
+    const successfulDelete = await fetch(`${base}/api/admin/locations/${deletableZoneBlockId}`, { method: 'DELETE', headers });
+    assert.strictEqual(successfulDelete.status, 200, await successfulDelete.text());
+    const deletedLocations = await fetch(`${base}/api/admin/locations?q=${encodeURIComponent(deletablePayload.zoneBlock.name)}`, { headers }).then((response) => response.json());
+    assert.ok(!deletedLocations.some((item) => item.zoneBlockId === deletableZoneBlockId));
+
     const editedPayload = {
       province: `${payload.province.name} Updated`,
       city: `${payload.city.name} Updated`,
@@ -142,6 +161,7 @@ const { databaseEnabled, query } = require('../src/db');
   } finally {
     try {
       if (scheduleId) await query('DELETE FROM schedule WHERE id::text = $1', [scheduleId]);
+      if (deletableZoneBlockId && databaseEnabled()) await query('DELETE FROM zone_block WHERE id::text = $1', [deletableZoneBlockId]);
       if (zoneBlockId && databaseEnabled()) await query(`
         DELETE FROM province WHERE id = (
           SELECT p.id FROM province p JOIN city_municipality c ON c.province_id = p.id

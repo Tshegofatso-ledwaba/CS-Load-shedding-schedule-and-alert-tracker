@@ -99,6 +99,20 @@ const { schedules } = require('../src/data');
     assert.strictEqual(updateResponse.status, 200, JSON.stringify(updated));
     assert.strictEqual(updated.stage, 6);
 
+    const dashboardResponse = await fetch(`${base}/api/admin/dashboard`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const dashboard = await dashboardResponse.json();
+    assert.strictEqual(dashboardResponse.status, 200, JSON.stringify(dashboard));
+    if (!databaseEnabled()) {
+      const recentUpdate = dashboard.recentUpdates.find((item) => item.id === created.id);
+      assert.ok(recentUpdate, 'Expected the new schedule in recent dashboard updates.');
+      assert.strictEqual(recentUpdate.locationName, 'Zone 2');
+      assert.match(recentUpdate.locationPath, /Soshanguve Block F/);
+    } else {
+      assert.ok(dashboard.recentUpdates.some((item) => item.locationName && item.locationPath), 'Expected recent updates to include place names.');
+    }
+
     const deleteResponse = await fetch(`${base}/api/admin/schedules/${created.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
